@@ -1,15 +1,20 @@
-VERS?=		10
+TARGET?=	NETBSD
 ARCH?=		amd64
-DIST=		https://nycdn.netbsd.org/pub/NetBSD-daily/netbsd-${VERS}/latest/${ARCH}/binary
-KDIST=		${DIST}
+NETVERS?=	10
+NETDIST=	https://nycdn.netbsd.org/pub/NetBSD-daily/netbsd-${NETVERS}/latest/${ARCH}/binary
+KDIST=		${NETDIST}
+ALPVERS?=	3.21.0
+#ALPDIST=	https://dl-cdn.alpinelinux.org/alpine/v${ALPVERS%.*}/releases/${ARCH}
+ALPDIST=	https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/${ARCH}
+
 WHOAMI!=	whoami
 USER!= 		id -un
 GROUP!= 	id -gn
 ifneq (${WHOAMI}, root)
-SUDO!=		command -v doas || echo "sudo -E ARCH=${ARCH} VERS=${VERS}"
+SUDO!=		command -v doas || echo "sudo -E ARCH=${ARCH} NETVERS=${NETVERS}"
 endif
-SETSEXT=tar.xz
-SETSDIR=sets/${ARCH}
+SETSEXT=	tar.xz
+SETSDIR=	sets/${ARCH}
 
 ifeq (${ARCH}, evbarm-aarch64)
 KERNEL=		netbsd-GENERIC64.img
@@ -33,11 +38,20 @@ NBAKERY=	${BASE} comp.${SETSEXT}
 BOZO=		${BASE}
 IMGBUILDER=	${BASE}
 
+# Alpine rootfs / iso to fetch
+ALPINE_ROOTFS=alpine-minirootfs-${ALPVERS}-${ARCH}.tar.gz
+ALPINE_ISO=alpine-virt-${ALPVERS}-${ARCH}.iso
+ALPINE= 	${ALPINE_ROOTFS} ${ALPINE_VIRT}
+
 ifeq ($(shell uname -m), x86_64)
-ROOTFS?=	-r ld0a
+ROOTFS?=       -r ld0a
 else
 # unknown / aarch64
-ROOTFS?=	-r ld5a
+ROOTFS?=       -r ld5a
+endif
+
+ifeq (${TARGET}, ALPINE)
+ROOTFS?=	-r vda
 endif
 
 # any BSD variant including MacOS
@@ -75,12 +89,28 @@ kernfetch:
 	)
 
 setfetch:
+	@echo "fetching sets"
 	[ -d ${SETSDIR} ] || mkdir -p ${SETSDIR}
 	for s in ${SETS}; do \
 		if [ ! -f ${SETSDIR}/$$s ]; then \
-			curl -L -o ${SETSDIR}/$$s ${DIST}/sets/$$s; \
+			curl -L -o ${SETSDIR}/$$s ${NETDIST}/sets/$$s; \
 		fi; \
 	done
+
+alpinefetch:
+	@echo "fetching Alpine"
+	[ -d ${SETSDIR} ] || mkdir -p ${SETSDIR}
+	for s in ${SETS}; do \
+		if [ ! -f ${SETSDIR}/$$s ]; then \
+			curl -L -o ${SETSDIR}/$$s ${ALPDIST}/$$s; \
+		fi; \
+	done
+
+alpine:
+	$(MAKE) alpinefetch SETS="${ALPINE_ROOTFS} ${ALPINE_ISO}"
+	${SUDO} ./mkimg.sh -t ${SERVICE} -i ${SERVICE}-${ARCH}.img -s ${SERVICE} \
+		-m 20 -x "${ALPINE_ROOTFS}" -z "${ALPINE_ISO}" ${EXTRAS} 
+	${SUDO} chown ${USER}:${GROUP} $@-${ARCH}.img
 
 rescue:
 	$(MAKE) setfetch SETS="${RESCUE}"

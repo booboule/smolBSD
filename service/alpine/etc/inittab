@@ -1,0 +1,13 @@
+# Set the default init system to use BusyBox init.
+::sysinit:/etc/init.rcS           # System initialization scripts
+::shutdown:/etc/init.rcK          # Shutdown scripts
+
+# Run getty (login prompt) on console
+::respawn:/sbin/getty 115200 tty1   # Console login
+::respawn:/sbin/getty 115200 tty2   # Optional second virtual terminal
+
+# Runlevel 0 (halt)
+#l0:0:wait:/sbin/halt                # Halt the system
+
+# Runlevel 6 (reboot)
+#l6:6:wait:/sbin/reboot              # Reboot the system

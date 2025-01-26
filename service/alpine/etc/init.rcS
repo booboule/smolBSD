@@ -1,0 +1,18 @@
+#!/bin/sh
+
+export HOME=/
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin
+umask 022
+
+mount -a
+mount -o remount,rw /
+
+sh
+
+poweroff -f
+
+# Disable job control in BusyBox shell
+#setsid sh
+
+# Launch the shell with job control disabled
+#sh --no-job-control

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+#root=$(mount|grep "ext4"|awk '{print $1}')
+poweroff -f
+#umount -a
+#fsck -q -y $root

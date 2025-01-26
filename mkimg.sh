@@ -20,11 +20,12 @@ _USAGE_
 	exit 1
 }
 
-options="s:m:i:r:x:k:c:oh"
+options="s:m:i:r:x:k:c:z:t:oh"
 
 while getopts "$options" opt
 do
 	case $opt in
+	t) tgt="$OPTARG";;
 	s) svc="$OPTARG";;
 	m) megs="$OPTARG";;
 	i) img="$OPTARG";;
@@ -32,6 +33,7 @@ do
 	x) sets="$OPTARG";;
 	k) kernel="$OPTARG";;
 	c) curlsh="$OPTARG";;
+	z) iso="$OPTARG";;
 	o) rofs=y;;
 	h) usage;;
 	*) usage;;
@@ -40,10 +42,12 @@ done
 
 arch=${ARCH:-"amd64"}
 
+tgt=${tgt:-"netbsd"}
 svc=${svc:-"rescue"}
 megs=${megs:-"20"}
 img=${img:-"rescue-${arch}.img"}
 sets=${sets:-"rescue.tar.xz"}
+iso=${iso:-"alpine-virt-3.21.0-${arch}.iso"}
 
 OS=$(uname -s)
 
@@ -76,8 +80,9 @@ fi
 
 dd if=/dev/zero of=./${img} bs=1${u} count=${megs}
 
-mkdir -p mnt
+mkdir -p mnt iso
 mnt=$(pwd)/mnt
+isodir=$(pwd)/iso
 
 if [ -n "$is_linux" ]; then
 	mke2fs -O none $img
@@ -108,15 +113,41 @@ else
 
 fi
 
+if [ -f "sets/${arch}/${iso}" ]; then
+	echo "ISO found"
+	mount -t iso9660 -o loop,ro "sets/${arch}/${iso}" "${isodir}"
+
+	iso_kernel=$(find "${isodir}" -name "vmlinuz-*" | head -n 1)
+	iso_initrd=$(find "${isodir}" -name "initramfs-*" | head -n 1)
+
+	if [ -z "$iso_kernel" -o -z "$iso_initrd" ]; then
+		echo "Kernel or initrd not found in the ISO. Exiting."
+		umount "${isodir}"
+		exit 1
+	else
+		echo "Kernel and initrd found"
+		cp "$iso_kernel" .
+		cp "$iso_initrd" .
+	fi
+
+	umount "${isodir}"
+else
+	echo "ISO *NOT* found"
+fi
+
+
 [ -n "$rofs" ] && mountopt="ro" || mountopt="rw"
 echo "ROOT.a / $mountfs $mountopt 1 1" > ${mnt}/etc/fstab
 
 cp -Rf service/${svc}/etc/* ${mnt}/etc/
 cp -Rf service/common/* ${mnt}/etc/include/
 
+if [ "$tgt" = "netbsd" ]; then
+
 [ -n "$kernel" ] && cp -f $kernel ${mnt}/
 
 cd $mnt
+
 
 if [ "$svc" = "rescue" ]; then
 	for b in init mount_ext2fs
@@ -125,7 +156,6 @@ if [ "$svc" = "rescue" ]; then
 	done
 	ln -s /rescue/sh bin/
 fi
-
 
 # warning, postinst operations are done on the builder
 
@@ -149,6 +179,7 @@ cp dev/MAKEDEV etc/
 
 # proceed with caution
 [ -n "$curlsh" ] && curl -sSL "$CURLSH" | /bin/sh
+fi
 
 cd ..
 
