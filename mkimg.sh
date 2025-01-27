@@ -142,6 +142,10 @@ echo "ROOT.a / $mountfs $mountopt 1 1" > ${mnt}/etc/fstab
 cp -Rf service/${svc}/etc/* ${mnt}/etc/
 cp -Rf service/common/* ${mnt}/etc/include/
 
+if [ "$tgt" = "alpine" ]; then
+    chmod +x ${mnt}/etc/init.rc[S,K]
+fi
+
 if [ "$tgt" = "netbsd" ]; then
 
 [ -n "$kernel" ] && cp -f $kernel ${mnt}/
